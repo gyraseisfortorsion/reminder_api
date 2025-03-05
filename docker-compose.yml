@@ -1,0 +1,31 @@
+version: '1'
+
+services:
+  api:
+    platform: linux/amd64
+    command: bash -c "uvicorn api:app --host 0.0.0.0 --port 8001 --reload"
+    build: .
+    container_name: api
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/var/app
+      - /dev/snd:/dev/snd
+      - shared_audio:/shared_audio
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    networks:
+      - shared_network
+    extra_hosts:
+      - "host.docker.internal:194.110.54.189"
+
+volumes:
+  shared_audio:
+    driver: local
+
+networks:
+  shared_network:
+    external: true
