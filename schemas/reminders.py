@@ -28,9 +28,10 @@ class ReminderBase(BaseModel):
     recurrence: Optional[str]
     reminder_at: datetime
     is_active: Optional[bool] = True
-    call_status: Optional[NotificationStatusEnum] = NotificationStatusEnum.pending
     channels: List[ChannelsEnum]
     reminder_status: Optional[ReminderStatusEnum] = ReminderStatusEnum.pending
+    custom_phone: Optional[str] = None
+    custom_email: Optional[str] = None
 
     @validator('recurrence')
     def validate_recurrence(cls, v):

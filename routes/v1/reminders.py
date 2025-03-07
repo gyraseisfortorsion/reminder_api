@@ -36,3 +36,26 @@ def get_user_reminders(credentials: HTTPAuthorizationCredentials = Depends(HTTPB
     if not auth_service.get_role(credentials.credentials):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     return user.reminders
+
+@router.put("/{reminder_id}", response_model=ReminderRead)
+def update_reminder(reminder_id: str, body: ReminderUpdate, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db: Session = Depends(get_db)):
+    # check credentials
+    user = auth_service.get_current_user(credentials.credentials, db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    reminder = reminder_service.get(db, reminder_id)
+    if reminder.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    return reminder_service.update(db, reminder, body)
+
+@router.delete("/{reminder_id}")
+def delete_reminder(reminder_id: str, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db: Session = Depends(get_db)):
+    user = auth_service.get_current_user(credentials.credentials, db)
+    # check credentials
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    reminder = reminder_service.get(db, reminder_id)
+    if reminder.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    reminder_service.delete(db, reminder_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

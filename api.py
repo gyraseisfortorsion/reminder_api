@@ -54,10 +54,10 @@ async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "healthy"}
 
-# Define startup event to create necessary directories
-@app.on_event("startup")
-async def startup_event():
-    os.makedirs("/shared_audio/audio", exist_ok=True)
+# # Define startup event to create necessary directories
+# @app.on_event("startup")
+# async def startup_event():
+#     os.makedirs("/shared_audio/audio", exist_ok=True)
     
 # If the file is run directly
 if __name__ == "__main__":

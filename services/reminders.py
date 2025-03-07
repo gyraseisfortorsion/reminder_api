@@ -145,6 +145,17 @@ class ReminderService(ServiceBase[Reminder, ReminderCreate, ReminderUpdate]):
         db.refresh(reminder)
         return reminder
 
+    def delete(self, db: Session, id: str):
+        reminder = self.get(db, id)
+        # find all messages and notifications which reference this reminder and set their remider_id to null
+        for notification in reminder.notifications:
+            db.delete(notification)
+        for message in reminder.message:
+            message.reminder_id = None
+            db.add(message)
+        db.delete(reminder)
+        db.commit()
+        return reminder
 
 
 reminder_service = ReminderService(Reminder)
