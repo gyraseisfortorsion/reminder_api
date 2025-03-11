@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from core import get_db
-from schemas import LoginForm, UserCreate, UserPreferencesUpdate, UserPreferencesRead, UserRead
+from schemas import LoginForm, UserCreate, UserPreferencesUpdate, UserPreferencesRead, UserRead, UserUpdate
 from services import auth_service, user_service, user_preferences_service
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
@@ -38,6 +38,14 @@ def get_user_preferences(credentials: HTTPAuthorizationCredentials = Depends(HTT
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
     return user_preferences_service.get_by_user_id(user.id, db)
+
+@router.put("/user", response_model = UserRead)
+def update_user(body: UserUpdate, credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db: Session = Depends(get_db)):
+    user = auth_service.get_current_user(credentials.credentials, db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    
+    return user_service.update(db, user, body)
 
 @router.post("/logout")
 def logout(refresh_token: str, db: Session = Depends(get_db)):
