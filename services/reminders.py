@@ -131,7 +131,7 @@ class ReminderService(ServiceBase[Reminder, ReminderCreate, ReminderUpdate]):
             "description": reminder.description,
             "recurrence": reminder.recurrence if reminder.recurrence and reminder.recurrence!="" else None,
             "reminder_at": reminder.reminder_at.isoformat(),
-            "channels": [channel for channel in reminder.channels],
+            "channels": [channel for channel in reminder.channels] if len(reminder.channels) > 0 else ["phone"],
             "custom_phone": reminder.custom_phone,
             "custom_email": reminder.custom_email
         })
