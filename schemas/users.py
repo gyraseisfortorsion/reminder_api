@@ -27,12 +27,6 @@ class UserUpdate(BaseModel):
     surname: str
     email: str
     phone_number: str
-    last_signed_at: Optional[datetime]
-    avatar_url: Optional[str]
-    is_active: Optional[bool]
-    is_verified: Optional[bool]
-    is_blocked: Optional[bool]
-    updated_at: datetime
 
 
 

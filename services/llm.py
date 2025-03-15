@@ -6,7 +6,6 @@ from google.genai import types
 from services import reminder_service
 from google.generativeai.types import content_types
 from collections.abc import Iterable
-from google import genai
 from groq import Groq
 import json
 import ast
