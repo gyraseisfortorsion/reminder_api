@@ -11,12 +11,14 @@ import json
 import ast
 from datetime import datetime
 from .messages import message_service
+from openai import OpenAI
 
 class LLM():
         
     def __init__(self):
         self.gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
+        self.openai = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.GROQ_MODEL = 'llama-3.3-70b-versatile'
         self.SYSTEM_INSTRUCTION = """
 YOU ARE A HIGHLY EFFICIENT AI REMINDER ASSISTANT, DESIGNED TO HELP USERS CREATE ACCURATE AND RELIABLE REMINDERS. YOUR PRIMARY FUNCTION IS TO GATHER NECESSARY DETAILS AND CALL THE FUNCTION `create_reminder(reminder: ReminderCreate)` TO SET UP REMINDERS CORRECTLY.  
@@ -253,6 +255,121 @@ EXTRACT OR CLARIFY THE FOLLOWING INFORMATION:
             response_message = second_response.choices[0].message
             message_service.create_from_llm(user.id, response_message.content, is_llm=True, db=db) 
             return  {"response":response_message.content, "reminder": None}
-
+    # def query_llm_deepseek(self, message: str, user: User, db: Session):
+    #     user = db.query(User).filter(User.id == user.id).first()
+    #     # append user id to the message
+    #     message = f"User ID {user.id}: {message}"
+    #     config = {
+    #         'tools': [reminder_service.create_from_llm],
+    #         'system_instruction': self.SYSTEM_INSTRUCTION
+    #     }
+    #     chat = self.gemini_client.chats.create(model='deepseek-1.0', config=config)
+    #     response = chat.send_message(message)
+    #     return response
+    def query_llm_openai(self, user_prompt: str, user: User, db: Session):
+        user = db.query(User).filter(User.id == user.id).first()
+        message_service.create_from_llm(user.id, user_prompt, is_llm=False, db=db)
+        user_channels = []
+        prefs = user.user_preferences[0]
+        if prefs.is_whatsapp_enabled:
+            user_channels.append("whatsapp")
+        if prefs.is_phone_enabled:
+            user_channels.append("phone")
+        if prefs.is_sms_enabled:
+            user_channels.append("sms")
+        if prefs.is_email_enabled:
+            user_channels.append("email")
+        user_prompt = f"User ID:{user.id}. Preferred channels: {user_channels}. User request: {user_prompt}"
+        messages = message_service.get_history_for_llm(user.id, db)
+        messages.append({
+            "role": "user",
+            "content": user_prompt,
+        })
+        tools = [
+            {
+            "type": "function",
+            "function": {
+            "name": "create_from_llm",
+            "description": "Create a reminder from LLM input. Reminder should only be created if the user requests to create a reminder, or implies the creation of a reminder.",
+            "parameters": {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                "type": "string",
+                "description": "The UUID of the user",
+                },
+                "title": {
+                "type": "string",
+                "description": "The title of the reminder",
+                },
+                "description": {
+                "type": "string",
+                "description": "The description of the reminder",
+                },
+                "reminder_at": {
+                "type": "string",
+                "description": f"Should be provided in the format of isoformat, e.g. 2022-12-31T23:59:59. Current date is {datetime.now().astimezone().isoformat()} with device timezone",
+                },
+                "channels": {
+                "type": "array",
+                "items": {
+                "type": "string",
+                "enum": ["whatsapp", "phone", "sms", "email"],
+                },
+                "description": "Notification methods. If not provided in the user request, use the user's preferred channels",
+                },
+                "recurrence": {
+                "type": "string",
+                "description": "Should be a number (periodicity) or one of the following: week, 2 weeks, month, 3 months, 6 months, year",
+                },
+                "custom_phone": {
+                "type": "string",
+                "description": "Custom phone number to use",
+                },
+                "custom_email": {
+                "type": "string",
+                "description": "Custom email to use",
+                },
+                "is_certain_time": {
+                "type": "boolean",
+                "description": "Whether the provided time is certain (e.g. tomorrow at 9am) or relative (e.g. in 2 hours), if relative then False)",
+                },
+            },
+            "required": ["user_id", "title", "description", "reminder_at", "channels"],
+            },
+            },
+            }
+        ]
+        response_raw = self.openai.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            tools=tools
+        )
+        # print(response)
+        response= response_raw.choices[0].message
+        tool_call = None
+        if not response.tool_calls:
+            response_message = response_raw.choices[0].message
+            message_service.create_from_llm(user.id, response_message.content, is_llm=True, db=db)
+            return {"response":response_message.content, "reminder": None}
+        else:
+            tool_call = response.tool_calls[0]
+        messages.append(response)
+        args = json.loads(tool_call.function.arguments)
+        function_response = reminder_service.create_from_llm(**args)
+        function_response_dict = ast.literal_eval(function_response)
+        # make secondary response based on the tool call
+        messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": function_response,
+        })
+        response = self.openai.chat.completions.create(
+            model="gpt-4o",
+            messages=messages
+        )
+        response_message = response.choices[0].message
+        message_service.create_from_llm(user.id, response_message.content, is_llm=True, db=db, reminder_id=function_response_dict["id"])
+        return {"response":response_message.content, "reminder": function_response_dict if function_response_dict else None}
 
 llm_service = LLM()

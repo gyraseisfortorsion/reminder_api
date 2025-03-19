@@ -12,4 +12,4 @@ def create_reminder(message: LLMQuery, credentials: HTTPAuthorizationCredentials
     user = auth_service.get_current_user(credentials.credentials, db)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-    return llm_service.query_llm_groq(message.message, user, db)
+    return llm_service.query_llm_openai(message.message, user, db)
